@@ -20,6 +20,8 @@ namespace rnn {
     } ACTIVATION_FUNCTION;
 
     class Layer {
+        public:
+
         //Hidden state - aT = tanh(Wax @ xT + Waa @ aT_1 + bA)
         matrix::Matrix<float> A; //Hidden state
         matrix::Matrix<float> Wax; //Weight matrix of input
@@ -42,21 +44,15 @@ namespace rnn {
 
         public:
 
-        RNN(std::vector<size_t> nX, std::vector<size_t> nA) {
+        RNN(std::vector<size_t> layerDimensions) {
 
-            size_t nLayers = nX.size();
-            assert(nX.size() + 1 == nA.size());
-            //nX is expected to be one shorter than nA
-            //This is because nA contains the number of output neurones to the system in its final layer
-            
-            size_t *nA = NULL;
-            size_t *nX = NULL;
-            size_t *nY = NULL;
+            size_t nLayers = layerDimensions.size();
+            layers.resize(nLayers);
 
             for(size_t i = 0; i < nLayers; i++) {
                 rnn::Layer &currentLayer = this->layers[i];                
                 
-                currentLayer.A. 
+                
             }
 
         }
