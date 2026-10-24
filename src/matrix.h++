@@ -98,7 +98,39 @@ namespace matrix {
             return this->data[row * this->cols + col];
         }
 
-        
+        /**
+         * @brief Re-dimension a matrix with new rows and columns, clears the matrix
+         * 
+         * @param rows :: New rows 
+         * @param cols :: New rows
+         * 
+         * @return Matrix<T>& :: Result matrix (this)
+         */
+        Matrix<T> &redimension(size_t rows, size_t cols) {
+
+            this->rows = rows;
+            this->cols = cols;
+            this->data.resize(rows * cols);
+            return *this;
+        }        
+
+
+
+        /**
+         * @brief Fill a matrix with a value
+         * 
+         * @param value :: Value to fill 
+         * 
+         * @return Matrix<T>& :: Result matrix (this)
+         */
+        Matrix<T> &fill(T value) {
+
+            for(size_t i = 0; i < this->rows * this->cols; i++) {
+                this->data[i] = value;
+            }
+
+            return *this;
+        }   
 
         /**
          * @brief In place matrix multiplication (z = xw)
