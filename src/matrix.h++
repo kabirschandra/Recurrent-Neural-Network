@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <random>
 #include <cmath>
 #include <vector>
 
@@ -26,10 +27,7 @@ namespace matrix {
         public:
 
         /**
-         * @brief Boring constructor for matrix class
-         * 
-         * @param rows :: Rows of the matrix
-         * @param cols :: Cols of the matrix
+         * @brief Construct an empty matrix.
          */
         Matrix(void) {
             this->rows = 0;
@@ -37,10 +35,10 @@ namespace matrix {
         }
 
         /**
-         * @brief Initialise a matrix and reserve memory for its buffers
-         * 
-         * @param rows :: Rows of the matrix
-         * @param cols :: Cols of the matrix
+         * @brief Construct a matrix with the specified dimensions.
+         *
+         * @param rows Number of rows.
+         * @param cols Number of columns.
          */
         Matrix(size_t rows, size_t cols) {
             this->rows = rows;
@@ -49,10 +47,11 @@ namespace matrix {
         }
 
         /**
-         * @brief Construct a matrix with a pointer to data
-         * 
-         * @param rows :: Rows of matrix
-         * @param cols :: Cols of matrix
+         * @brief Construct a matrix by copying values from a vector.
+         *
+         * @param rows Number of rows.
+         * @param cols Number of columns.
+         * @param data Vector containing the matrix values.
          */
         Matrix(size_t rows, size_t cols, std::vector<T> &data) {
             this->rows = rows;
@@ -61,11 +60,11 @@ namespace matrix {
         }
 
        /**
-        * @brief Fill a matrix with a vector (pre-dimensioned)
-        * 
-        * @param vec :: Vector to copy from
+        * @brief Replace the matrix values with those in a vector.
         *
-        * @return void :: None
+        * @param vec Vector to copy from.
+        *
+        * @return void
         */
         void fill_vector(std::vector<T> &vec) {
             this->data = vec;
@@ -74,9 +73,9 @@ namespace matrix {
 
 
        /**
-        * @brief Getter for a matrix's data
+        * @brief Get a constant reference to the matrix's values.
         *
-        * @return const std::vector<float> & :: Const reference to internal vector
+        * @return const std::vector<T>& Constant reference to the internal values.
         */
         const std::vector<T> &get_vector(void) {
             return this->data;;
@@ -84,27 +83,35 @@ namespace matrix {
 
 
         /**
-         * @brief Refer to a element in a matrix
+         * @brief Access a matrix element.
          * 
-         * @param row :: Row of element
-         * @param col :: Col of element
+         * @param row Zero-based row index.
+         * @param col Zero-based column index.
          * 
-         * @return const T& :: Constant reference to data
+         * @return T& Reference to the element.
          */
         inline T& at(size_t row, size_t col) {
             return this->data[row * this->cols + col];
         }
+
+        /**
+         * @brief Access a matrix element without allowing modification.
+         *
+         * @param row Zero-based row index.
+         * @param col Zero-based column index.
+         * @return const T& Constant reference to the element.
+         */
         inline const T& at(size_t row, size_t col) const {
             return this->data[row * this->cols + col];
         }
 
         /**
-         * @brief Re-dimension a matrix with new rows and columns, clears the matrix
+         * @brief Resize the matrix to the specified dimensions.
          * 
-         * @param rows :: New rows 
-         * @param cols :: New rows
+         * @param rows New number of rows.
+         * @param cols New number of columns.
          * 
-         * @return Matrix<T>& :: Result matrix (this)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &redimension(size_t rows, size_t cols) {
 
@@ -115,13 +122,36 @@ namespace matrix {
         }        
 
 
+        /**
+         * @brief Initialize the matrix using the Xavier uniform distribution.
+         *
+         * @return Matrix<T>& Reference to this matrix.
+         */
+        Matrix<T> &xavier_uniform() {
+
+            constexpr float numerator = 6.0f;
+
+            const float limit = std::sqrt(
+                numerator / static_cast<float>(this->rows + this->cols)
+            );
+
+            static thread_local std::mt19937 rng(std::random_device{}());
+            std::uniform_real_distribution<float> dist(-limit, limit);
+
+            for(size_t i = 0; i < this->rows * this->cols; i++) {
+                this->data[i] = dist(rng);
+            }
+
+            return *this;
+        }
+
 
         /**
-         * @brief Fill a matrix with a value
+         * @brief Fill every element of the matrix with a value.
          * 
-         * @param value :: Value to fill 
+         * @param value Value to assign to each element.
          * 
-         * @return Matrix<T>& :: Result matrix (this)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &fill(T value) {
 
@@ -132,13 +162,81 @@ namespace matrix {
             return *this;
         }   
 
+
         /**
-         * @brief In place matrix multiplication (z = xw)
+         * @brief Multiply this matrix by another matrix and return the result.
          * 
-         * @param x :: X matrix
-         * @param w :: W matrix
+         * @param rhs Right-hand matrix; its row count must match this matrix's column count.
          * 
-         * @return Matrix<T>& :: Result matrix (this)
+         * @return Matrix<T> Product matrix.
+         */
+        Matrix<T> operator*(Matrix<T> &rhs) {
+            Matrix<T> result(this->rows, rhs.cols);
+
+            for(size_t i = 0; i < this->rows; i++) {
+                for(size_t j = 0; j < rhs.cols; j++) {
+                    result.at(i, j) = T{};
+                    for(size_t k = 0; k < this->cols; k++) {
+                        result.at(i, j) += this->at(i, k) * rhs.at(k, j);
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        /**
+         * @brief Add another matrix element-wise and return the result.
+         *
+         * @param rhs Right-hand matrix with the same dimensions as this matrix.
+         *
+         * @return Matrix<T> Sum matrix.
+         */
+        Matrix<T> operator+(Matrix<T> &rhs) {
+            Matrix<T> result(this->rows, this->cols);
+            for(size_t i = 0; i < this->rows * this->cols; i++) {
+                result.data[i] = this->data[i] + rhs.data[i];
+            }
+
+            return result;
+        }
+
+        /**
+         * @brief Append a column vector to this matrix.
+         *
+         * @param column Column vector to append; it must have the same number of rows.
+         *
+         * @return Matrix<T>& Reference to this matrix.
+         */
+        Matrix<T> &append_column(Matrix<T> &column) {
+
+            std::vector<T> appended;
+            appended.reserve(this->rows * (this->cols + 1));
+            for(size_t i = 0; i < this->rows; i++) {
+                for(size_t j = 0; j < this->cols; j++) {
+                    appended.push_back(this->at(i, j));
+                }
+                appended.push_back(column.at(i, 0));
+            }
+
+            this->data = std::move(appended);
+            this->cols++;
+            return *this;
+        }
+
+
+        
+
+
+        /**
+         * @brief Multiply two matrices into this matrix, optionally transposing either input.
+         * 
+         * @param x Left-hand input matrix.
+         * @param w Right-hand input matrix.
+         * @param transposeX Whether to transpose the left-hand input.
+         * @param transposeW Whether to transpose the right-hand input.
+         * 
+         * @return Matrix<T>& Reference to this matrix containing the product.
          */
         Matrix<T> &multiply(Matrix<T> &x, Matrix<T> &w, bool transposeX, bool transposeW) {
             //Multiply
@@ -167,11 +265,11 @@ namespace matrix {
 
 
         /**
-         * @brief Bias a matrix in place
+         * @brief Add another matrix element-wise to this matrix.
          * 
-         * @param x :: Bias to add
+         * @param rhs Matrix to add; it must have the same number of elements.
          * 
-         * @return Matrix<T>& :: This matrix (result)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &add(Matrix<T> &rhs) {
             for(size_t i = 0; i < rhs.rows * rhs.cols; i++) {
@@ -181,11 +279,11 @@ namespace matrix {
         }
 
         /**
-         * @brief Negative bias a matrix in place
+         * @brief Subtract another matrix element-wise from this matrix.
          * 
-         * @param rhs :: Negative bias to add (rhs)
+         * @param rhs Matrix to subtract; it must have the same number of elements.
          * 
-         * @return Matrix<T>& :: This matrix (result)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &subtract(Matrix<T> &rhs) {
             for(size_t i = 0; i < rhs.rows * rhs.cols; i++) {
@@ -195,11 +293,11 @@ namespace matrix {
         }
 
         /**
-         * @brief Hadamard a matrix in place (negative)
+         * @brief Multiply this matrix element-wise by another matrix.
          * 
-         * @param rhs :: Hadamard rhs
+         * @param rhs Matrix to multiply element-wise; it must have the same number of elements.
          * 
-         * @return Matrix<T>& :: This matrix (result)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &hadamard(Matrix<T> &rhs) {
             for(size_t i = 0; i < rhs.rows * rhs.cols; i++) {
@@ -210,9 +308,9 @@ namespace matrix {
 
 
         /**
-         * @brief Get the number of rows in a matrix
+         * @brief Get the number of rows in the matrix.
          * 
-         * @return Number of rows in the matrix
+         * @return size_t Number of rows.
          */
         size_t get_rows(void) {
             return this->rows;
@@ -220,20 +318,20 @@ namespace matrix {
 
 
         /**
-         * @brief Get the number of cols in a matrix
+         * @brief Get the number of columns in the matrix.
          * 
-         * @return Number of cols in the matrix
+         * @return size_t Number of columns.
          */
         size_t get_cols(void) {
             return this->cols;
         }
 
         /**
-         * @brief Multiply a matrix by a scalar 
+         * @brief Multiply every element of the matrix by a scalar.
          * 
-         * @param scalar :: Scalar to multiply by 
+         * @param scalar Scalar to multiply by.
          * 
-         * @return Matrix<T>& :: This matrix (result)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &scalar_multiply(T scalar) {
             for(size_t i = 0; i < this->rows * this->cols; i++) {
@@ -244,11 +342,11 @@ namespace matrix {
 
 
         /**
-         * @brief Rowwise addition of two matricies
+         * @brief Add the first row of another matrix to each row of this matrix.
          * 
-         * @param matrix :: Row to add
+         * @param matrix Matrix whose first row is added to each row of this matrix.
          * 
-         * @return Matrix<T>& :: This matrix (result)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &add_row(Matrix<T> &matrix) {
             for(size_t i = 0; i < this->rows; i++) {
@@ -261,11 +359,11 @@ namespace matrix {
 
 
         /**
-         * @brief Append a matrix to a file, including dimensions
+         * @brief Append the matrix dimensions and values to a file.
          * 
-         * @param fileName :: File name
+         * @param fileName Path of the file to append to.
          * 
-         * @return bool :: Indication of if matrix was successfully written (true = yes)
+         * @return bool True if writing to the file succeeds; otherwise, false.
          */
         bool append_to_file(std::string fileName) {
             std::ofstream file(fileName, std::ios::app);
@@ -284,11 +382,11 @@ namespace matrix {
 
 
         /**
-         * @brief Read a matrix from a file stream. Expects rows,\n,cols,\n,data
+         * @brief Read matrix dimensions and values from a file stream.
          * 
-         * @param fstream :: File name
+         * @param file Input stream containing rows, columns, and matrix values.
          * 
-         * @return bool :: Indication of if matrix was successfully read (true = yes)
+         * @return bool True if the stream is valid at entry; otherwise, false.
          */
         bool read_float_file_fstream(std::ifstream &file) {
             if(!file) {
@@ -321,11 +419,11 @@ namespace matrix {
 
 
         /**
-         * @brief Sum accross all rows in a matrix
+         * @brief Add each row of another matrix to the first row of this matrix.
          * 
-         * @param matrix :: Rows to sum accross
+         * @param matrix Matrix whose rows are accumulated.
          * 
-         * @return Matrix<T>& :: This matrix (result)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &sum_rows(Matrix<T> &matrix) {
             for(size_t i = 0; i < this->rows; i++) {
@@ -338,9 +436,9 @@ namespace matrix {
         
 
         /**
-         * @brief ReLU activation on a matrix
+         * @brief Apply the ReLU activation element-wise.
          * 
-         * @return Matrix<T>& :: This (result matrix)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &activate_relu(void) {
             for(size_t i = 0; i < this->rows * this->cols; i++) {
@@ -349,9 +447,9 @@ namespace matrix {
             return *this;
         }
         /**
-         * @brief ReLU derivative activation on a matrix
+         * @brief Replace each element with its ReLU derivative.
          * 
-         * @return Matrix<T>& :: This (result matrix)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &activate_derivative_relu(void) {
             for(size_t i = 0; i < this->rows * this->cols; i++) {
@@ -361,9 +459,9 @@ namespace matrix {
         }
 
         /**
-         * @brief Sigmoid activation on a matrix
+         * @brief Apply the sigmoid activation element-wise.
          * 
-         * @return Matrix<T>& :: This (result matrix)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &activate_sigmoid(void) {
             for(size_t i = 0; i < this->rows * this->cols; i++) {
@@ -373,9 +471,9 @@ namespace matrix {
         }
 
         /**
-         * @brief Sigmoid derivative activation on a matrix
+         * @brief Replace each element with its sigmoid derivative.
          * 
-         * @return Matrix<T>& :: This (result matrix)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &activate_derivative_sigmoid(void) {
             for(size_t i = 0; i < this->rows * this->cols; i++) {
@@ -384,12 +482,29 @@ namespace matrix {
             }
             return *this;
         }
+        /**
+         * @brief Copy a column from this matrix into a column vector.
+         *
+         * @param col Zero-based index of the column to retrieve.
+         *
+         * @return Matrix<T> Column vector with the same number of rows.
+         */
+        Matrix<T> get_column(size_t col) const {
 
+
+            Matrix<T> result(this->rows, 1);
+
+            for(size_t i = 0; i < this->rows; i++) {
+                result.at(i, 0) = this->at(i, col);
+            }
+
+            return result;
+        }
 
         /**
-         * @brief Tanh activation on a matrix
+         * @brief Apply the hyperbolic tangent activation element-wise.
          * 
-         * @return Matrix<T>& :: This (result matrix)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &activate_tanh(void) {
             for(size_t i = 0; i < this->rows * this->cols; i++) {
@@ -399,9 +514,9 @@ namespace matrix {
         }
 
         /**
-         * @brief Tanh derivative activation on a matrix
+         * @brief Replace each element with its hyperbolic tangent derivative.
          * 
-         * @return Matrix<T>& :: This (result matrix)
+         * @return Matrix<T>& Reference to this matrix.
          */
         Matrix<T> &activate_derivative_tanh(void) {
             for(size_t i = 0; i < this->rows * this->cols; i++) {
