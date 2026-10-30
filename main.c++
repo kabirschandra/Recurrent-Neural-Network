@@ -1,10 +1,8 @@
 #include "./src/matrix.h++"
-#include "./src/rnn.h++"
-
 
 int main(void) {
 
-    rnn::RNN rnn = rnn::RNN({3,4,5,5,4,3}, rnn::ACTIVATION_FUNCTION::TANH);
+    Matrix m1(3, 2, {1,2, 3,4, 5,6});
 
     return 0;
 }
