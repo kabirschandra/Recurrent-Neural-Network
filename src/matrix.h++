@@ -63,6 +63,8 @@ class Matrix {
     /// Brief: Prints the matrix contents to standard output.
     /// @return None.
     void disp(void) const {
+
+        std::cout << "=== " << this->rows << " x " << this->cols << " matrix ===\n";
         for(size_t r = 0; r < this->rows; r++) {
             for(size_t c = 0; c < this->cols; c++) {
                 std::cout << this->at(r, c) << " ";

@@ -5,7 +5,7 @@ int main(void) {
 
 
     RNN rnn = RNN({3,4,2});
-    rnn.disp();
+    //rnn.disp();
 
 
     Matrix f = Matrix(3, 4, {
@@ -14,6 +14,7 @@ int main(void) {
         0, 0, 1, 0,
     });
     Matrix y = rnn.forward(f);
+    y.disp();
 
 
     return 0;
