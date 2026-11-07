@@ -36,7 +36,7 @@ class RNN {
     private:
     size_t nLayers;
     std::vector<Layer> layers; 
-
+    Matrix y;
 
     public:
     RNN(std::vector<size_t> layerDimensions) {
@@ -59,20 +59,20 @@ class RNN {
             currentLayer.dIn = dIn;
             currentLayer.dOut = dOut;
 
-            currentLayer.Ht = Matrix(dIn, 1);
-            currentLayer.Ht.uniform_initialisation(-b, b);
+            currentLayer.Ht = Matrix(dIn, 0);
+            currentLayer.Ht = currentLayer.Ht.fill(0.0f);
 
             currentLayer.Htprev = Matrix(dOut, 1);
-            currentLayer.Htprev.uniform_initialisation(-b, b);
+            currentLayer.Htprev = currentLayer.Htprev.fill(0.0f);
 
             currentLayer.Wih = Matrix(dOut, dIn);
-            currentLayer.Wih.uniform_initialisation(-b, b);
+            currentLayer.Wih = currentLayer.Wih.uniform_initialisation(-b, b);
 
             currentLayer.Whh = Matrix(dOut, dOut);
-            currentLayer.Whh.uniform_initialisation(-b, b);
+            currentLayer.Whh = currentLayer.Whh.uniform_initialisation(-b, b);
 
             currentLayer.B = Matrix(dOut, 1);
-            currentLayer.B.uniform_initialisation(-b, b);
+            currentLayer.B = currentLayer.B.uniform_initialisation(-b, b);
         }
     }
 
@@ -117,27 +117,35 @@ class RNN {
         "RNN forward pass dimension missmatch. Network contains "
          << this->layers.front().dIn << " input neurons, but x has " << x.get_rows() << " rows.");
 
+        //Clear previous state
+        for(Layer &layer : this->layers) {
+            layer.Ht = Matrix(layer.dIn, 0);
+            layer.Htprev = Matrix(layer.dOut, 1);
+            layer.Htprev = layer.Htprev.fill(0.0f);
+        }
+
         Matrix y = Matrix(this->layers.back().dOut, 0); //Will append each column to y
         for(size_t i = 0; i < x.get_cols(); i++) {
             //For each input on x
 
-            this->layers.front().Ht = x.get_col(i);
+            this->layers.front().Ht = this->layers.front().Ht.append_cols(x.get_col(i));
             Matrix htC;
             for(size_t j = 0; j < this->nLayers; j++) {
                 //For each layer in the network
 
                 Layer &currentLayer = this->layers[j];
 
-                htC = ((currentLayer.Wih * currentLayer.Ht) + 
-                (currentLayer.Whh * currentLayer.Htprev) + 
+                htC = ((currentLayer.Wih * currentLayer.Ht.get_col(currentLayer.Ht.get_cols() - 1)) + 
+                (currentLayer.Whh * currentLayer.Htprev.get_col(currentLayer.Htprev.get_cols() - 1)) + 
                 currentLayer.B).activate(tanhf);
 
-                currentLayer.Htprev = htC;
-
+                //currentLayer.Htprev = htC;
+                currentLayer.Htprev = currentLayer.Htprev.append_cols(htC);
 
                 if(j != this->nLayers - 1) { //Append to next layer
                     Layer &nextLayer = this->layers[j + 1];
-                    nextLayer.Ht = htC;
+                    //nextLayer.Ht = htC;
+                    nextLayer.Ht = nextLayer.Ht.append_cols(htC);
 
                 } else { //Final layer, append to y
                     y = y.append_cols(htC);
@@ -146,8 +154,16 @@ class RNN {
 
         }
 
-
+        this->y = y;
         return y;
+    }
+
+    void backward(Matrix &yActual) {
+
+
+
+        
+        return;
     }
 
 };

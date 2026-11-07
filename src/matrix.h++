@@ -118,29 +118,35 @@ class Matrix {
     /// Brief: Resizes the matrix and adjusts its internal storage.
     /// @param rows New number of rows.
     /// @param cols New number of columns.
-    /// @return None.
-    void resize(size_t rows, size_t cols) {
-        this->rows = rows;
-        this->cols = cols;
-        this->data.resize(rows * cols);
-        return;
+    /// @return Resized matrix.
+    Matrix resize(size_t rows, size_t cols) {
+        ASSERT_VAR(rows * cols == this->data.size(),
+        "New rows and cols do not match existing dimensions for existing data matrix. [rows, cols]: ["
+        << rows << ", " << cols << "]. Data matrix elements: " << this->data.size() << "\n"
+        );
+        Matrix m = Matrix(rows, cols);
+        m.data = this->data;
+        return m;
     }
 
     /// Brief: Fills every matrix element with the specified value.
     /// @param v Value used to fill the matrix.
-    /// @return None.
-    void fill(float v) {
-        for(auto &i : this->data) {
-            i = v;
+    /// @return Filled matrix.
+    Matrix fill(float v) {
+
+        Matrix m = Matrix(this->rows, this->cols);
+        for(size_t i = 0; i < this->rows * this->cols; i++) {
+            m.data[i] = v;
         }
-        return;
+
+        return m;
     }
 
     /// Brief: Initialises matrix elements using a uniform random distribution.
     /// @param min Lower bound of the distribution.
     /// @param max Upper bound of the distribution.
-    /// @return None.
-    void uniform_initialisation(float min, float max) {
+    /// @return Uniformly initialised matrix.
+    Matrix uniform_initialisation(float min, float max) {
         ASSERT_VAR(min <= max,
             "Matrix::uniform_initialisation(): Invalid range ["
             << min << ", " << max << "].");
@@ -149,10 +155,11 @@ class Matrix {
         static std::mt19937 gen(rd());
         std::uniform_real_distribution<float> dist(min, max);
 
-        for(auto &i : this->data) {
-            i = dist(gen);
+        Matrix m = Matrix(this->rows, this->cols);
+        for(size_t i = 0; i < this->rows * this->cols; i++) {
+            m.data[i] = dist(gen);
         }
-        return;
+        return m;
     }
 
     /// Brief: Extracts a single column as a new matrix.
