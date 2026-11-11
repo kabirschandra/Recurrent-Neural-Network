@@ -16,6 +16,9 @@ int main(void) {
     Matrix y = rnn.forward(f);
     y.disp();
 
+    Matrix yActual = Matrix(1, 4);
+    yActual.disp();
+    rnn.backward(yActual);
 
     return 0;
 }

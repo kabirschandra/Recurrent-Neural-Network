@@ -36,11 +36,11 @@ class RNN {
     private:
     size_t nLayers;
     std::vector<Layer> layers; 
-    Matrix y;
+    Matrix yPred;
 
     public:
     RNN(std::vector<size_t> layerDimensions) {
-        ASSERT_VAR(layerDimensions.size() >= 2, "RNN cannot accept zero length layer dimension vector");
+        ASSERT_VAR(layerDimensions.size() >= 2, "RNN cannot accept zero length layer dimension vector\n");
 
         this->layers.resize(layerDimensions.size() - 1);
         size_t nLayers = layerDimensions.size() - 1; 
@@ -115,7 +115,7 @@ class RNN {
     Matrix forward(Matrix &x) {
         ASSERT_VAR(x.get_rows() == this->layers.front().dIn, 
         "RNN forward pass dimension missmatch. Network contains "
-         << this->layers.front().dIn << " input neurons, but x has " << x.get_rows() << " rows.");
+         << this->layers.front().dIn << " input neurons, but x has " << x.get_rows() << " rows.\n");
 
         //Clear previous state
         for(Layer &layer : this->layers) {
@@ -154,14 +154,50 @@ class RNN {
 
         }
 
-        this->y = y;
+        this->yPred = y;
         return y;
     }
 
     void backward(Matrix &yActual) {
+        ASSERT_VAR((this->yPred.get_rows() == yActual.get_rows()) 
+        && (this->yPred.get_cols() == yActual.get_cols()), 
+        "RNN backward pass input mismatch. Prediction matrix is: " 
+        << yActual.get_rows() << " x " << yActual.get_cols() 
+        << " but ground truth matrix is: " 
+        << yPred.get_rows() << " x " << yPred.get_cols() << ".\n");
 
 
+        auto mse = [](Matrix yPred, Matrix yActual, size_t col) -> float {
+            float loss = 0.0f; 
 
+            Matrix yPredCurrent = yPred.get_col(col);
+            Matrix yActualCurrent = yActual.get_col(col);
+
+            for(size_t i = 0; i < yPredCurrent.get_rows(); i++) {
+                loss += powf((yPredCurrent.at(i, 1) - yActualCurrent.at(i, 1)), 2);
+            }
+
+            loss /= (float)(yPredCurrent.get_rows());
+
+            return loss;
+        };
+
+
+        for(size_t i = this->nLayers; i != SIZE_MAX; i--) { //For each layer
+
+            //Temporal path (Shared component)
+            
+
+            //Wih
+
+
+            //Whh
+
+
+            //B
+
+
+        }
         
         return;
     }
