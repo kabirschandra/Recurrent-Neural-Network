@@ -1,93 +1,62 @@
 # C++ based recurrent neural network
 
-A single-threaded, multilayer recurrent neural network (RNN) written in C++. Uses only the STL. Implements a vanilla RNN with Tanh activation and Backpropagation Through Time (BPTT) for training on sequential data.
+A single-threaded, multilayer vanilla recurrent neural network written in C++. Uses only the STL and a custom matrix class. Built to understand how recurrent networks work, particularly hidden states and backpropagation through time (BPTT), rather than to be fast or production-ready.
 
 ## Features
 
 - CPU only
-
-- Configurable number of recurrent layers and neurons per layer
-
-- Tanh activation for hidden and output layers
-
+- Configurable layer sizes
+- Tanh activation in every recurrent layer
 - Many-to-many sequence processing
-
-- Backpropagation Through Time (BPTT)
-
-- Mean Squared Error (MSE) loss function
-
-- Xavier uniform weight initialisation
-
-- Custom matrix library for linear algebra operations
-
-- Gradient descent weight updates
-
-- Processes one sequence at a time
+- Backpropagation through time (BPTT)
+- Mean squared error (MSE) loss
+- Xavier uniform initialisation
+- Gradient descent updates
+- Custom matrix operations; no external C++ libraries
 
 ## Project Structure
 
 | Directory | What's inside |
-| ----- | ----- |
-| `./src` | RNN and matrix source code |
-| `./tests/Sine` | Sine-wave prediction test and Python plotting script |
-| `./tests/Smoke` | Basic forward, backward and MSE validation |
-| `./bin` | Compiled test binaries |
-| `./run_tests.sh` | Test compilation, execution and cleanup script |
+| --- | --- |
+| `./src` | RNN and matrix headers |
+| `./tests/Smoke` | Basic forward, loss and backward checks |
+| `./tests/Sine` | Sine-wave prediction and plotting |
+| `./tests/XOR` | Two-step XOR experiment |
+| `./tests/MNIST` | Handwritten-digit sequence experiment |
+| `./build` | Compiled test binaries |
+| `./run_tests.sh` | Test runner |
 
 ## Requirements
 
-- C++17 or newer
+- C++17 or newer (`g++` or `clang++`)
 - Linux or WSL
-- No external C++ libraries
-- Python 3 with Matplotlib for plotting test results
+- Python 3 and Matplotlib for the sine plots only
+- MNIST IDX dataset files for the MNIST test
 
 ## Basic Usage
 
 ```cpp
 #include <iostream>
 #include <vector>
-#include "./src/matrix.h++"
-#include "./src/rnn.h++"
+#include "src/rnn.h++"
 
-int main(void) {
+int main() {
+    // 1 input, 4 hidden neurons, 1 output
+    RNN net({1, 4, 1});
 
-    // 1 input neuron, 4 hidden neurons, 1 output neuron
-    std::vector<size_t> layers = {1, 4, 1};
+    // Each column is one timestep
+    Matrix input(1, 5);
+    Matrix target(1, 5);
 
-    // Create recurrent neural network
-    RNN net(layers);
+    for (size_t t = 0; t < 5; ++t) {
+        input.at(0, t) = static_cast<float>(t) * 0.1f;
+        target.at(0, t) = static_cast<float>(t + 1) * 0.1f;
+    }
 
-    // Create input sequence containing 5 timesteps
-    Matrix x(1, 5);
-
-    x.at(0, 0) = 0.0f;
-    x.at(0, 1) = 0.1f;
-    x.at(0, 2) = 0.2f;
-    x.at(0, 3) = 0.3f;
-    x.at(0, 4) = 0.4f;
-
-    // Expected output sequence
-    Matrix expected_output(1, 5);
-
-    expected_output.at(0, 0) = 0.1f;
-    expected_output.at(0, 1) = 0.2f;
-    expected_output.at(0, 2) = 0.3f;
-    expected_output.at(0, 3) = 0.4f;
-    expected_output.at(0, 4) = 0.5f;
-
-    // Perform forward pass
-    Matrix output = net.forward(x);
-
-    // Calculate mean squared error
-    float loss = net.mse(expected_output);
-
-    std::cout << "MSE: " << loss << "\n";
-
-    // Perform backpropagation through time
-    net.backward(expected_output, 0.001f);
-
-    // Display network weights, biases and hidden states
-    net.disp();
+    // Forward pass, loss, then BPTT update
+    Matrix output = net.forward(input);
+    std::cout << "MSE: " << net.mse(target) << '\n';
+    net.backward(target, 0.001f);
 
     return 0;
 }
@@ -95,226 +64,145 @@ int main(void) {
 
 ## Architecture
 
-The network consists of one or more recurrent layers. Each layer maintains its own input weights, recurrent weights, biases and hidden states.
+Each recurrent layer has input weights (`Wih`), recurrent weights (`Whh`), biases (`B`) and hidden states. At timestep `t`, layer `l` calculates:
 
-At each timestep, the hidden state is calculated as:
-
-\[
+$$
 h_t^{(l)} = \tanh\left(W_{ih}^{(l)}x_t^{(l)} + W_{hh}^{(l)}h_{t-1}^{(l)} + b^{(l)}\right)
-\]
+$$
 
-Where:
+- `Wih` maps the current input into the hidden layer.
+- `Whh` maps the previous hidden state into the current hidden state.
+- `B` is the bias vector.
+- `x` is the current input (or the previous layer's output).
+- `h` is the hidden state.
 
-- \(W_{ih}\) is the input weight matrix
-- \(W_{hh}\) is the recurrent weight matrix
-- \(b\) is the bias vector
-- \(x_t\) is the input to the layer at timestep \(t\)
-- \(h_{t-1}\) is the previous hidden state
-
-The output of each layer becomes the input to the next layer at the same timestep.
-
-The final layer's hidden state is used directly as the network output.
-
-### Input and Output
-
-Inputs and outputs use the custom `Matrix` class.
-
-Each column represents one timestep, while each row represents one neuron.
-
-For example, a sequence with 3 input features and 5 timesteps has dimensions:
-
-```text
-Input matrix: 3 x 5
-
-        t0  t1  t2  t3  t4
-       --------------------
-Input 1 | x   x   x   x   x
-Input 2 | x   x   x   x   x
-Input 3 | x   x   x   x   x
-```
-
-A network with 2 output neurons returns a `2 x 5` matrix.
-
-The network processes all timesteps sequentially.
+The final layer's hidden state is the network output. The input matrix has dimensions `features x timesteps`; the output matrix has dimensions `output neurons x timesteps`. Hidden states start at zero for each forward pass.
 
 ## Training
 
-Training uses Backpropagation Through Time (BPTT).
+Training uses full backpropagation through time. The forward pass stores hidden states for each timestep. The backward pass propagates error through the layers and backward through time, accumulates gradients and updates the weights and biases.
 
-For each training iteration:
+The Tanh derivative is:
 
-1. Perform a forward pass over the input sequence.
-2. Calculate the Mean Squared Error against the target sequence.
-3. Calculate output gradients.
-4. Propagate gradients backwards through the recurrent connections and preceding layers.
-5. Accumulate weight and bias gradients across all timesteps.
-6. Update weights and biases using gradient descent.
+$$
+\frac{d}{dz}\tanh(z) = 1 - \tanh^2(z)
+$$
 
-The network uses the Tanh derivative:
+Gradient descent updates each parameter using:
 
-\[
-\tanh'(z)=1-\tanh^2(z)
-\]
+$$
+W_{\mathrm{new}} = W_{\mathrm{old}} - \eta\frac{\partial L}{\partial W}
+$$
 
-Parameters are updated using:
-
-\[
-W_{\text{new}}=W_{\text{old}}-\eta\frac{\partial L}{\partial W}
-\]
-
-Where \(\eta\) is the learning rate.
+Here, `eta` is the learning rate.
 
 ### Mean Squared Error
 
-The network uses Mean Squared Error as its loss function:
+The network uses MSE across all output neurons and timesteps:
 
-\[
-MSE=\frac{1}{NT}\sum_{t=0}^{T-1}\sum_{i=0}^{N-1}(\hat{y}_{i,t}-y_{i,t})^2
-\]
+$$
+\mathrm{MSE} = \frac{1}{NT}\sum_{t=0}^{T-1}\sum_{i=0}^{N-1}(\hat{y}_{i,t} - y_{i,t})^2
+$$
 
-Where:
+- `N` is the number of output neurons.
+- `T` is the number of timesteps.
+- `y_hat` is the predicted output.
+- `y` is the target output.
 
-- \(N\) is the number of output neurons
-- \(T\) is the number of timesteps
-- \(\hat{y}\) is the predicted output
-- \(y\) is the expected output
-
-The `mse()` method calculates loss using the predictions stored from the most recent forward pass.
+Call `mse(target)` after `forward(input)`. The backward-pass output gradient should use the same `1 / (N * T)` normalisation for consistency.
 
 ## Memory
 
-The network allocates its weight matrices, recurrent weight matrices and biases during construction.
+Weights and biases are created when the network is constructed. The forward pass stores activations across timesteps so BPTT can use them later. Hidden-state matrices grow with sequence length, and the backward pass creates gradient matrices.
 
-Hidden states and layer inputs are stored for every timestep during the forward pass. These values are required for Backpropagation Through Time.
-
-Gradient matrices are allocated during the backward pass and accumulated across the sequence.
-
-The network resets its hidden states to zero at the beginning of each forward pass.
-
-Memory usage increases with sequence length, number of layers and number of neurons.
-
-Unlike a pre-allocated network, the current implementation dynamically grows its hidden-state matrices as additional timesteps are processed.
+This implementation favours code that is easy to follow over minimising allocations or memory use.
 
 ## Limitations
 
-- Batch size fixed at 1 sequence
-
-- No GPU support
-
-- Single-threaded only
-
+- Processes one sequence at a time; no mini-batches
+- Single-threaded CPU implementation
 - Tanh activation only
+- No LSTM or GRU gates
+- No gradient clipping or truncated BPTT
+- Basic gradient descent only
+- Hidden state resets between forward passes
+- Recursive BPTT recalculates intermediate gradients and becomes very slow for longer sequences
+- No save/load support
 
-- No LSTM or GRU support
-
-- No gradient clipping
-
-- No truncated BPTT
-
-- No built-in optimiser beyond gradient descent
-
-- No model save/load functionality
-
-- Hidden states reset between forward passes
-
-- Output values are limited to the Tanh range of -1 to 1
-
-- Recursive BPTT implementation recalculates intermediate gradients rather than caching them
+These are deliberate trade-offs for a learning project. The aim is to implement the forward pass, state handling and gradients myself, not to compete with established ML frameworks.
 
 ## Testing
 
-The library includes tests for basic network functionality and sine-wave sequence prediction.
-
-The sine test trains the RNN to predict the next value in a sine-wave sequence.
-
-The Python plotting script generates graphs of the training loss and predicted outputs.
-
-### Run All Tests
+The test runner is in the repository root:
 
 ```bash
 chmod +x run_tests.sh
-./run_tests.sh all
+./run_tests.sh help
 ```
 
-### Individual Tests
-
 | Test | Location | What it tests |
-|------|----------|----------------|
-| Smoke | `tests/Smoke/main.c++` | Forward pass, MSE calculation and backward pass |
-| Sine | `tests/Sine/main.c++` | Sequential learning and BPTT |
-| Sine Plot | `tests/Sine/plot_sine.py` | Training loss and prediction visualisation |
+| --- | --- | --- |
+| Smoke | `tests/Smoke/main.c++` | Forward pass, MSE and backward-pass sanity checks |
+| Sine | `tests/Sine/main.c++` | Next-step prediction on a sine sequence |
+| XOR | `tests/XOR/main.c++` | Learning XOR from a two-timestep input sequence |
+| MNIST | `tests/MNIST/main.c++` | Treating image rows as a sequence for digit classification |
 
-### Running Tests
-
-Use the test runner script:
+### Commands
 
 ```bash
-# Display available commands
-./run_tests.sh help
-
-# Compile tests
+# Compile all tests
 ./run_tests.sh compile
 
-# Run smoke test
+# Run basic checks
 ./run_tests.sh smoke
 
-# Run sine-wave training
-./run_tests.sh run
+# Sine: epochs, learning rate, timesteps, step size
+./run_tests.sh run 5000 0.001 32 0.2
 
-# Generate plots
+# Plot sine results (requires matplotlib)
 ./run_tests.sh plot
 
-# Compile, run and plot
-./run_tests.sh all
+# XOR: epochs, learning rate
+./run_tests.sh xor 10000 0.01
 
-# Clean generated files
+# MNIST: epochs, training images, test images, learning rate
+./run_tests.sh mnist 1 100 100 0.001
+
+# Compile, smoke test, train sine and plot
+./run_tests.sh all 5000 0.001 32 0.2
+
+# Run all tests, including XOR and MNIST
+./run_tests.sh all-extended
+
+# Remove generated binaries and sine results
 ./run_tests.sh clean
 ```
 
-### Custom Training Parameters
+Set `CXX=clang++` before a command to use Clang instead of the default `g++`.
 
-The sine test accepts configurable training parameters:
+### Sine plots
 
-```bash
-./run_tests.sh all 10000 0.0001 5 0.1
-```
-
-Arguments:
-
-| Argument | Description |
-|----------|-------------|
-| `10000` | Number of training epochs |
-| `0.0001` | Learning rate |
-| `5` | Number of timesteps |
-| `0.1` | Step size between sine samples |
-
-### Plotting Results
-
-Install Matplotlib:
+Install Matplotlib if needed:
 
 ```bash
 python3 -m pip install matplotlib
 ```
 
-After running the sine test, the plotting script produces:
+The sine test writes `tests/Sine/loss.csv` and `tests/Sine/predictions.csv`. The plotting script produces `loss.png` and `predictions.png` in the same directory. The plotted predictions are on the training sequence, not a separate validation set.
 
-- `loss.csv` — MSE recorded during training
-- `predictions.csv` — Target and predicted values
-- `loss.png` — Training loss against epoch
-- `predictions.png` — Predicted sine wave against the target
+### XOR
 
-These files are generated inside `tests/Sine/`.
+Each example contains two binary inputs over two timesteps. The test uses the first input bit as the target at the first timestep and XOR as the target at the second timestep. It checks all four combinations after training. Results can vary with random initialisation.
 
-## Future Development
+### MNIST
 
-Potential improvements include:
+Download and decompress the four original MNIST IDX files and put them in `tests/MNIST/data/`:
 
-- Gradient clipping for more stable training
-- Truncated Backpropagation Through Time
-- Additional activation functions
-- Mini-batch training
-- Adam and momentum-based optimisers
-- Model save/load functionality
-- Configurable initial hidden states
-- LSTM and GRU implementations
-- Numerical gradient checking for BPTT validation
+- `train-images-idx3-ubyte`
+- `train-labels-idx1-ubyte`
+- `t10k-images-idx3-ubyte`
+- `t10k-labels-idx1-ubyte`
+
+The MNIST test treats each 28x28 image as 28 timesteps with 28 features each. It uses 10 Tanh outputs and MSE rather than softmax/cross-entropy. Accuracy is measured from the final timestep.
+
+**Note:** MNIST is included as an architecture experiment. With the current recursive BPTT implementation, even small runs may take a long time. High classification accuracy is not the goal of this project.
