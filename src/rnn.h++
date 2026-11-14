@@ -4,7 +4,6 @@
 #include <cmath>
 #include <iostream>
 #include "matrix.h++"
-// Custom assertion with descriptive error messages.
 #define ASSERT_VAR(condition, message) \
     do { \
         if (!(condition)) { \
@@ -39,6 +38,9 @@ class RNN {
     Matrix yPred;
 
     public:
+    /// Brief: Creates an RNN with the specified input, hidden, and output dimensions.
+    /// @param layerDimensions Neuron count for each layer, including input and output.
+    /// @return None.
     RNN(std::vector<size_t> layerDimensions) {
         ASSERT_VAR(layerDimensions.size() >= 2, "RNN cannot accept zero length layer dimension vector\n");
 
@@ -77,6 +79,8 @@ class RNN {
     }
 
 
+    /// Brief: Prints each layer's weights, inputs, hidden states, and bias to standard output.
+    /// @return None.
     void disp(void) {
 
         for(size_t i = 0; i < this->layers.size(); i++) {
@@ -112,6 +116,9 @@ class RNN {
     }
 
 
+    /// Brief: Runs the input sequence through the network and stores its predictions.
+    /// @param x Input sequence with one input feature per row and one timestep per column.
+    /// @return Predicted output sequence with one output neuron per row and one timestep per column.
     Matrix forward(Matrix &x) {
         ASSERT_VAR(x.get_rows() == this->layers.front().dIn, 
         "RNN forward pass dimension missmatch. Network contains "
@@ -158,48 +165,147 @@ class RNN {
         return y;
     }
 
-    void backward(Matrix &yActual) {
-        ASSERT_VAR((this->yPred.get_rows() == yActual.get_rows()) 
-        && (this->yPred.get_cols() == yActual.get_cols()), 
-        "RNN backward pass input mismatch. Prediction matrix is: " 
-        << yActual.get_rows() << " x " << yActual.get_cols() 
-        << " but ground truth matrix is: " 
-        << yPred.get_rows() << " x " << yPred.get_cols() << ".\n");
+    /// Brief: Calculates gradients by backpropagation through time and updates network parameters.
+    /// @param yActual Target sequence matching the most recent predictions.
+    /// @param lr Positive learning rate used for the parameter updates.
+    /// @return None.
+    /// Requires a preceding non-empty forward pass with matching target dimensions.
+    void backward(Matrix &yActual, float lr) {
+        ASSERT_VAR(
+            (this->yPred.get_rows() == yActual.get_rows()) &&
+            (this->yPred.get_cols() == yActual.get_cols()),
+            "Prediction matrix is: " << this->yPred.get_rows() << " x " << this->yPred.get_cols()
+            << " but ground truth matrix is: "
+            << yActual.get_rows() << " x " << yActual.get_cols() << "\n"
+        );
 
+        ASSERT_VAR(
+            lr > 0.0f,
+            "Learning rate must be greater than zero. Rate: " << lr << "\n"
+        );
 
-        auto mse = [](Matrix yPred, Matrix yActual, size_t col) -> float {
-            float loss = 0.0f; 
+        ASSERT_VAR(
+            this->yPred.get_cols() > 0,
+            "Cannot perform backward pass without a non-empty forward pass."
+        );
 
-            Matrix yPredCurrent = yPred.get_col(col);
-            Matrix yActualCurrent = yActual.get_col(col);
+        //Temporal path (Shared component)
+            auto delta_t = [this, &yActual](auto&& self, size_t n, size_t t) -> Matrix {
+            //Should really cache deltas
 
-            for(size_t i = 0; i < yPredCurrent.get_rows(); i++) {
-                loss += powf((yPredCurrent.at(i, 1) - yActualCurrent.at(i, 1)), 2);
+            //Direct loss gradient: MSE gradient at the output layer
+            Matrix gt(this->layers[n].dOut, 1);
+            gt = gt.fill(0.0f);
+
+            if(n == this->nLayers - 1) {
+                Matrix error = this->yPred.get_col(t) - yActual.get_col(t);
+
+                gt = error.scalar_multiply(2.0f / (float)(this->layers[n].dOut * yActual.get_cols()));
             }
 
-            loss /= (float)(yPredCurrent.get_rows());
 
-            return loss;
+            //Spatial gradient contribution: Wih^(n+1)^T * delta_t^(n+1)
+            Matrix spatial(this->layers[n].dOut, 1);
+            spatial = spatial.fill(0.0f);
+
+            if (n + 1 < this->nLayers) {
+                spatial = this->layers[n + 1].Wih.transpose() * self(self, n + 1, t);
+            }
+
+
+            //Temporal contribution: Whh^T * delta(t+1)
+            Matrix temporal(this->layers[n].dOut, 1);
+            temporal = temporal.fill(0.0f);
+
+            if (t + 1 < yActual.get_cols()) {
+                temporal = this->layers[n].Whh.transpose() * self(self, n, t + 1);
+            }
+
+
+            //Tanh contribution
+            Matrix h = this->layers[n].Htprev.get_col(t + 1);
+            Matrix ones(this->layers[n].dOut, 1);
+            ones = ones.fill(1.0f);
+            Matrix tanhDerivative = ones - h.hadamard(h);
+
+
+            Matrix delta = (gt + spatial + temporal).hadamard(tanhDerivative);
+
+            return delta;
         };
 
 
-        for(size_t i = this->nLayers; i != SIZE_MAX; i--) { //For each layer
+        std::vector<Matrix> WihNew(this->nLayers);
+        std::vector<Matrix> WhhNew(this->nLayers);
+        std::vector<Matrix> BNew(this->nLayers);
+        for(size_t i = this->nLayers; i-- > 0;) { //For each layer
 
-            //Temporal path (Shared component)
-            
-
-            //Wih
-
-
-            //Whh
+            Layer &currentLayer = this->layers[i];
+            size_t tMax = yPred.get_cols();
 
 
-            //B
+            Matrix dWih(currentLayer.dOut, currentLayer.dIn);
+            Matrix dWhh(currentLayer.dOut, currentLayer.dOut);
+            Matrix dB(currentLayer.dOut, 1);
+            dWih = dWih.fill(0.0f);
+            dWhh = dWhh.fill(0.0f);
+            dB = dB.fill(0.0f);
+            for(size_t j = 0; j < tMax; j++) {
 
 
+                Matrix delta = delta_t(delta_t, i, j);
+                
+                dWih = dWih + delta * currentLayer.Ht.get_col(j).transpose();
+                dWhh = dWhh + delta * currentLayer.Htprev.get_col(j).transpose();
+                dB = dB + delta;
+            }
+
+            WihNew[i] = (currentLayer.Wih - dWih.scalar_multiply(lr));
+            WhhNew[i] = (currentLayer.Whh - dWhh.scalar_multiply(lr));
+            BNew[i] = (currentLayer.B - dB.scalar_multiply(lr));
         }
+       
         
+        for(size_t i = this->nLayers; i-- > 0;) {
+            
+            Layer &currentLayer = this->layers[i];
+
+            currentLayer.Wih = WihNew[i];
+            currentLayer.Whh = WhhNew[i];
+            currentLayer.B = BNew[i];
+        }
+
         return;
+    }
+
+
+
+    /// Brief: Calculates mean squared error for the most recent forward-pass predictions.
+    /// @param yActual Target sequence matching the stored predictions.
+    /// @return Mean squared error averaged over output neurons and timesteps.
+    float mse(const Matrix &yActual) const {
+        ASSERT_VAR(
+            this->yPred.get_rows() == yActual.get_rows() &&
+            this->yPred.get_cols() == yActual.get_cols(),
+            "RNN::mse(): Prediction and target dimensions do not match."
+        );
+
+        ASSERT_VAR(
+            this->yPred.get_rows() > 0 && this->yPred.get_cols() > 0,
+            "RNN::mse(): No non-empty forward-pass predictions available."
+        );
+
+        float sumSquaredError = 0.0f;
+
+        for (size_t r = 0; r < this->yPred.get_rows(); r++) {
+            for (size_t t = 0; t < this->yPred.get_cols(); t++) {
+                float error = this->yPred.at(r, t) - yActual.at(r, t);
+                sumSquaredError += error * error;
+            }
+        }
+
+        return sumSquaredError /
+            (float)(this->yPred.get_rows() * this->yPred.get_cols());
     }
 
 };
