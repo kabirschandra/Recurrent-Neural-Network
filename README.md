@@ -21,8 +21,6 @@ A single-threaded, multilayer vanilla recurrent neural network written in C++. U
 | `./src` | RNN and matrix headers |
 | `./tests/Smoke` | Basic forward, loss and backward checks |
 | `./tests/Sine` | Sine-wave prediction and plotting |
-| `./tests/XOR` | Two-step XOR experiment |
-| `./tests/MNIST` | Handwritten-digit sequence experiment |
 | `./build` | Compiled test binaries |
 | `./run_tests.sh` | Test runner |
 
@@ -31,7 +29,6 @@ A single-threaded, multilayer vanilla recurrent neural network written in C++. U
 - C++17 or newer (`g++` or `clang++`)
 - Linux or WSL
 - Python 3 and Matplotlib for the sine plots only
-- MNIST IDX dataset files for the MNIST test
 
 ## Basic Usage
 
@@ -144,13 +141,11 @@ chmod +x run_tests.sh
 | --- | --- | --- |
 | Smoke | `tests/Smoke/main.c++` | Forward pass, MSE and backward-pass sanity checks |
 | Sine | `tests/Sine/main.c++` | Next-step prediction on a sine sequence |
-| XOR | `tests/XOR/main.c++` | Learning XOR from a two-timestep input sequence |
-| MNIST | `tests/MNIST/main.c++` | Treating image rows as a sequence for digit classification |
 
 ### Commands
 
 ```bash
-# Compile all tests
+# Compile both tests
 ./run_tests.sh compile
 
 # Run basic checks
@@ -162,17 +157,8 @@ chmod +x run_tests.sh
 # Plot sine results (requires matplotlib)
 ./run_tests.sh plot
 
-# XOR: epochs, learning rate
-./run_tests.sh xor 10000 0.01
-
-# MNIST: epochs, training images, test images, learning rate
-./run_tests.sh mnist 1 100 100 0.001
-
 # Compile, smoke test, train sine and plot
 ./run_tests.sh all 5000 0.001 32 0.2
-
-# Run all tests, including XOR and MNIST
-./run_tests.sh all-extended
 
 # Remove generated binaries and sine results
 ./run_tests.sh clean
@@ -189,20 +175,3 @@ python3 -m pip install matplotlib
 ```
 
 The sine test writes `tests/Sine/loss.csv` and `tests/Sine/predictions.csv`. The plotting script produces `loss.png` and `predictions.png` in the same directory. The plotted predictions are on the training sequence, not a separate validation set.
-
-### XOR
-
-Each example contains two binary inputs over two timesteps. The test uses the first input bit as the target at the first timestep and XOR as the target at the second timestep. It checks all four combinations after training. Results can vary with random initialisation.
-
-### MNIST
-
-Download and decompress the four original MNIST IDX files and put them in `tests/MNIST/data/`:
-
-- `train-images-idx3-ubyte`
-- `train-labels-idx1-ubyte`
-- `t10k-images-idx3-ubyte`
-- `t10k-labels-idx1-ubyte`
-
-The MNIST test treats each 28x28 image as 28 timesteps with 28 features each. It uses 10 Tanh outputs and MSE rather than softmax/cross-entropy. Accuracy is measured from the final timestep.
-
-**Note:** MNIST is included as an architecture experiment. With the current recursive BPTT implementation, even small runs may take a long time. High classification accuracy is not the goal of this project.
